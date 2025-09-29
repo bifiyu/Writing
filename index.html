@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作文小幫手產生器（教師版）</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1, h2 {
+            color: #0056b3;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="password"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .api-key-note {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .checkbox-group label {
+            font-weight: normal;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .options-container {
+            display: flex;
+            gap: 30px;
+        }
+        .options-column {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>作文小幫手產生器（教師版）✍️</h1>
+        <p>請設定作文題目、文體、輔助工具，並輸入您的 Gemini API 金鑰。完成後，點擊按鈕即可產生專屬的學生作文網頁。</p>
+        
+        <form id="teacher-form">
+            <div class="form-group">
+                <label for="title">作文題目：</label>
+                <input type="text" id="title" name="title" required placeholder="例如：我最難忘的一次旅行">
+            </div>
+
+            <div class="form-group">
+                <label for="style">文體選擇：</label>
+                <select id="style" name="style">
+                    <option value="記敘文">記敘文</option>
+                    <option value="議論文">議論文</option>
+                    <option value="倒敘文">倒敘文</option>
+                </select>
+            </div>
+
+             <div class="form-group">
+                <label for="api-key">Gemini API 金鑰：</label>
+                <input type="password" id="api-key" name="api-key" required placeholder="請在此輸入您的 Gemini API Key">
+                <p class="api-key-note">此金鑰將被嵌入學生頁面中以啟用 AI 功能，請確保其權限安全。</p>
+            </div>
+
+            <div class="options-container">
+                <div class="options-column">
+                    <h2>主要輔助（點子發想）</h2>
+                    <div class="checkbox-group" id="major-assistance">
+                        <label><input type="checkbox" name="major" value="關鍵詞"> 關鍵詞</label>
+                        <label><input type="checkbox" name="major" value="主題情境"> 主題情境</label>
+                        <label><input type="checkbox" name="major" value="名人故事"> 名人故事</label>
+                        <label><input type="checkbox" name="major" value="自我範例"> 自我範例</label>
+                    </div>
+                </div>
+
+                <div class="options-column">
+                    <h2>次要輔助（生活經驗）</h2>
+                    <div class="checkbox-group" id="minor-assistance">
+                        <label><input type="checkbox" name="minor" value="圖片"> 圖片</label>
+                        <label><input type="checkbox" name="minor" value="對話"> 對話</label>
+                        <label><input type="checkbox" name="minor" value="補充說明"> 補充說明</label>
+                    </div>
+                </div>
+            </div>
+            
+            <br>
+            <button type="submit">產生學生作文工具</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('teacher-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const title = document.getElementById('title').value;
+            const style = document.getElementById('style').value;
+            const apiKey = document.getElementById('api-key').value;
+            
+            const majorOptions = Array.from(document.querySelectorAll('#major-assistance input:checked')).map(cb => cb.value);
+            const minorOptions = Array.from(document.querySelectorAll('#minor-assistance input:checked')).map(cb => cb.value);
+
+            if (!title || !apiKey) {
+                alert('請務必填寫作文題目和 Gemini API 金鑰！');
+                return;
+            }
+
+            const studentPageHTML = generateStudentPage(title, style, apiKey, majorOptions, minorOptions);
+
+            const blob = new Blob([studentPageHTML], { type: 'text/html;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'Student_Composition_Tool.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        function generateStudentPage(title, style, apiKey, majorOptions, minorOptions) {
+            
+            let majorAssistanceHTML = '';
+            if (majorOptions.length > 0) {
+                majorOptions.forEach(option => {
+                    majorAssistanceHTML += `
+                        <div class="input-group">
+                            <label for="major-${option}">${option}：</label>
+                            <textarea id="major-${option}" placeholder="請在此輸入關於「${option}」的內容..."></textarea>
+                        </div>`;
+                });
+            } else {
+                majorAssistanceHTML = '<p>老師未啟用此區塊。</p>';
+            }
+
+            let minorAssistanceHTML = '';
+            if (minorOptions.length > 0) {
+                minorOptions.forEach(option => {
+                    minorAssistanceHTML += '<div class="input-group">';
+                    if (option === '圖片') {
+                        minorAssistanceHTML += `
+                            <label for="minor-image-upload">上傳${option}：</label>
+                            <input type="file" id="minor-image-upload" accept="image/*">`;
+                    } else if (option === '對話') {
+                        minorAssistanceHTML += `
+                            <label for="minor-audio-upload">上傳${option}：</label>
+                            <input type="file" id="minor-audio-upload" accept="audio/*">`;
+                    } else {
+                        minorAssistanceHTML += `
+                            <label for="minor-${option}">${option}：</label>
+                            <textarea id="minor-${option}" placeholder="請在此輸入「${option}」..."></textarea>`;
+                    }
+                    minorAssistanceHTML += '</div>';
+                });
+            } else {
+                minorAssistanceHTML = '<p>老師未啟用此區塊。</p>';
+            }
+            
+            return `
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Composition Tool</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; }
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background-color: #007bff; color: white; border-radius: 8px; }
+        h1 { margin: 0; }
+        .info { font-size: 1.2em; margin-top: 10px; }
+        .main-container { display: flex; flex-wrap: wrap; gap: 20px; }
+        .column { background-color: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex: 1; min-width: 300px; padding: 20px; }
+        h2 { color: #0056b3; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #555; }
+        textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; resize: vertical; }
+        input[type="file"] { width: 100%; }
+        #composition-draft { height: 200px; }
+        #word-count { text-align: right; color: #888; font-size: 0.9em; margin-top: 5px; }
+        #gemini-output { white-space: pre-wrap; background-color: #f0f0f0; padding: 15px; border-radius: 5px; min-height: 150px; font-size: 1.1em; line-height: 1.6; }
+        #generate-btn { display: block; width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; transition: background-color 0.3s; }
+        #generate-btn:hover { background-color: #218838; }
+        #generate-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${title}</h1>
+        <div class="info">文體：${style}</div>
+    </div>
+    <div class="main-container">
+        <div class="column">
+            <h2>Major Assistance:</h2>
+            <div id="major-inputs">${majorAssistanceHTML}</div>
+        </div>
+        <div class="column">
+            <h2>Minor Assistance:</h2>
+            <div id="minor-inputs">${minorAssistanceHTML}</div>
+        </div>
+        <div class="column">
+            <h2>草稿區：</h2>
+            <div class="input-group">
+                <label for="composition-draft">作文草稿 (100字以內)</label>
+                <textarea id="composition-draft" maxlength="100" placeholder="請在此輸入你的作文..."></textarea>
+                <div id="word-count">0 / 100</div>
+            </div>
+            <div class="input-group">
+                <label for="text-upload">或上傳文字檔：</label>
+                <input type="file" id="text-upload" accept=".txt">
+            </div>
+        </div>
+        <div class="column">
+            <h2>Gemini 作文建議</h2>
+            <button id="generate-btn">產生作文</button>
+            <div id="gemini-output" style="margin-top: 15px;">AI生成的文章將顯示於此...</div>
+        </div>
+    </div>
+    <script>
+        const API_KEY = '${apiKey}';
+        // CORRECTED: Reverted to the stable and available gemini-2.5-flash-preview-05-20 model
+        const API_URL = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\${API_KEY}\`;
+
+        const draftTextarea = document.getElementById('composition-draft');
+        const wordCount = document.getElementById('word-count');
+        const generateBtn = document.getElementById('generate-btn');
+        const geminiOutput = document.getElementById('gemini-output');
+        const imageInput = document.getElementById('minor-image-upload');
+        const textFileInput = document.getElementById('text-upload');
+
+        draftTextarea.addEventListener('input', () => {
+            wordCount.textContent = draftTextarea.value.length + ' / 100';
+        });
+
+        textFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                draftTextarea.value = e.target.result.slice(0, 100);
+                draftTextarea.dispatchEvent(new Event('input'));
+            };
+            reader.readAsText(file);
+        });
+
+        function fileToGenerativePart(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64Data = reader.result.split(',')[1];
+                    resolve({
+                        inlineData: {
+                            mimeType: file.type,
+                            data: base64Data
+                        }
+                    });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.disabled = true;
+            geminiOutput.textContent = 'AI 正在思考中，請稍候...';
+
+            try {
+                const parts = [];
+                
+                let textPrompt = \`你是一位友善且專業的國小作文老師。請根據以下資訊，為一位國小學生寫一篇大約500字的「${style}」。\\n\\n作文題目是：「${title}」。\\n\`;
+
+                const majorInputs = Array.from(document.querySelectorAll('#major-inputs textarea'));
+                if (majorInputs.length > 0) {
+                    textPrompt += "\\n--- 主要輔助資料 ---\\n";
+                    majorInputs.forEach(input => {
+                        if (input.value) {
+                           textPrompt += \`\${input.labels[0].textContent} \${input.value.trim()}\\n\`;
+                        }
+                    });
+                }
+
+                const minorInputs = Array.from(document.querySelectorAll('#minor-inputs textarea'));
+                 if (minorInputs.length > 0) {
+                    textPrompt += "\\n--- 次要輔助資料 ---\\n";
+                    minorInputs.forEach(input => {
+                        if (input.value) {
+                            textPrompt += \`\${input.labels[0].textContent} \${input.value.trim()}\\n\`;
+                        }
+                    });
+                }
+                
+                const studentDraft = draftTextarea.value.trim();
+                if (studentDraft) {
+                    textPrompt += \`\\n--- 學生草稿 (請參考這個想法並擴寫成一篇完整的文章) ---\\n\${studentDraft}\\n\`;
+                }
+
+                textPrompt += "\\n--- 寫作指令 ---\\n請整合以上所有資訊，寫出一篇流暢、有趣且符合題意的文章。如果學生有上傳圖片，也請在文章中自然地描述圖片內容，將它融入故事中。文章需通順且適合國小學生閱讀。";
+                
+                parts.push({ text: textPrompt });
+
+                if (imageInput && imageInput.files.length > 0) {
+                    const imagePart = await fileToGenerativePart(imageInput.files[0]);
+                    parts.push(imagePart);
+                }
+                
+                const payload = { 
+                    contents: [{ parts }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        topP: 0.95,
+                        topK: 40
+                    }
+                };
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    const errorDetails = result.error ? \`\${result.error.code} \${result.error.status}: \${result.error.message}\` : 'Unknown API error';
+                    throw new Error(errorDetails);
+                }
+
+                const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (generatedText) {
+                    geminiOutput.textContent = generatedText;
+                } else {
+                    geminiOutput.textContent = '無法從 AI 取得有效的回覆。可能是因為內容政策或是暫時性問題，請稍後再試。';
+                }
+
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                geminiOutput.textContent = \`發生錯誤：\${error.message}\`;
+            } finally {
+                generateBtn.disabled = false;
+            }
+        });
+    <\/script>
+</body>
+</html>`;
+        }
+    </script>
+</body>
+</html>
+
